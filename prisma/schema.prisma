@@ -1,0 +1,60 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb" // MUDAR PARA "sqlite" SE ESTIVER USANDO UM ARQUIVO .db
+  url      = env("DATABASE_URL")
+}
+
+// Modelo de Usuário
+model User {
+  id        String      @id @default(auto()) @map("_id") @db.ObjectId // Para MongoDB
+  nome      String
+  email     String      @unique
+  senha     String
+  appointments Appointment[] // Relação com agendamentos
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
+// Modelo de Serviço
+model Service {
+  id          String      @id @default(auto()) @map("_id") @db.ObjectId // Para MongoDB
+  tema        String      // Ex: "Cabelo", "Barba", "Cabelo + Barba"
+  nomeServico String
+  appointments Appointment[] // Relação com agendamentos
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+// Modelo de Barbeiro
+model Barber {
+  id           String      @id @default(auto()) @map("_id") @db.ObjectId // Para MongoDB
+  nomeBarbeiro String
+  appointments Appointment[] // Relação com agendamentos
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+}
+
+// Modelo de Agendamento
+model Appointment {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId // Para MongoDB
+  dia         Int
+  mes         Int
+
+  // Relações com outros modelos
+  usuarioId   String   @map("userId") @db.ObjectId // Chave estrangeira para User
+  usuario     User     @relation(fields: [usuarioId], references: [id])
+
+  servicoId   String   @map("serviceId") @db.ObjectId // Chave estrangeira para Service
+  servico     Service  @relation(fields: [servicoId], references: [id])
+
+  barbeiroId  String   @map("barberId") @db.ObjectId // Chave estrangeira para Barber
+  barbeiro    Barber   @relation(fields: [barbeiroId], references: [id])
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

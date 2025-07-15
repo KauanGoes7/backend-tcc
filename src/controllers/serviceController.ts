@@ -51,8 +51,14 @@ export const getServiceById = async (req: Request, res: Response) => {
     const { id } = req.params;
 
     try {
+        // ID do parâmetro da URL é string, precisa converter para Int para o Prisma com SQLite
+        const serviceId = parseInt(id); // <-- CORREÇÃO: Conversão de string para number
+        if (isNaN(serviceId)) { // <-- Boa prática: verifica se a conversão foi bem-sucedida
+            return res.status(400).json({ message: 'ID de serviço inválido.' });
+        }
+
         const service = await prisma.service.findUnique({
-            where: { id: id }
+            where: { id: serviceId } // <-- Usando o ID convertido
         });
 
         if (!service) {
@@ -78,8 +84,14 @@ export const updateService = async (req: Request, res: Response) => {
     }
 
     try {
+        // ID do parâmetro da URL é string, precisa converter para Int para o Prisma com SQLite
+        const serviceId = parseInt(id); // <-- CORREÇÃO: Conversão de string para number
+        if (isNaN(serviceId)) { // <-- Boa prática: verifica se a conversão foi bem-sucedida
+            return res.status(400).json({ message: 'ID de serviço inválido.' });
+        }
+
         const updatedService = await prisma.service.update({
-            where: { id: id },
+            where: { id: serviceId }, // <-- Usando o ID convertido
             data: {
                 tema,
                 nomeServico
@@ -102,8 +114,14 @@ export const deleteService = async (req: Request, res: Response) => {
     const { id } = req.params;
 
     try {
+        // ID do parâmetro da URL é string, precisa converter para Int para o Prisma com SQLite
+        const serviceId = parseInt(id); // <-- CORREÇÃO: Conversão de string para number
+        if (isNaN(serviceId)) { // <-- Boa prática: verifica se a conversão foi bem-sucedida
+            return res.status(400).json({ message: 'ID de serviço inválido.' });
+        }
+
         await prisma.service.delete({
-            where: { id: id },
+            where: { id: serviceId }, // <-- Usando o ID convertido
         });
         res.status(200).json({ message: 'Serviço deletado com sucesso.' });
     } catch (error: any) {

@@ -45,8 +45,14 @@ export const getBarberById = async (req: Request, res: Response) => {
     const { id } = req.params;
 
     try {
+        // ID do parâmetro da URL é string, precisa converter para Int para o Prisma com SQLite
+        const barberId = parseInt(id); // <-- CORREÇÃO: Conversão de string para number
+        if (isNaN(barberId)) { // <-- Boa prática: verifica se a conversão foi bem-sucedida
+            return res.status(400).json({ message: 'ID de barbeiro inválido.' });
+        }
+
         const barber = await prisma.barber.findUnique({
-            where: { id: id }
+            where: { id: barberId } // <-- Usando o ID convertido
         });
 
         if (!barber) {
@@ -71,8 +77,14 @@ export const updateBarber = async (req: Request, res: Response) => {
     }
 
     try {
+        // ID do parâmetro da URL é string, precisa converter para Int para o Prisma com SQLite
+        const barberId = parseInt(id); // <-- CORREÇÃO: Conversão de string para number
+        if (isNaN(barberId)) { // <-- Boa prática: verifica se a conversão foi bem-sucedida
+            return res.status(400).json({ message: 'ID de barbeiro inválido.' });
+        }
+
         const updatedBarber = await prisma.barber.update({
-            where: { id: id },
+            where: { id: barberId }, // <-- Usando o ID convertido
             data: {
                 nomeBarbeiro
             }
@@ -94,8 +106,14 @@ export const deleteBarber = async (req: Request, res: Response) => {
     const { id } = req.params;
 
     try {
+        // ID do parâmetro da URL é string, precisa converter para Int para o Prisma com SQLite
+        const barberId = parseInt(id); // <-- CORREÇÃO: Conversão de string para number
+        if (isNaN(barberId)) { // <-- Boa prática: verifica se a conversão foi bem-sucedida
+            return res.status(400).json({ message: 'ID de barbeiro inválido.' });
+        }
+
         await prisma.barber.delete({
-            where: { id: id },
+            where: { id: barberId }, // <-- Usando o ID convertido
         });
         res.status(200).json({ message: 'Barbeiro deletado com sucesso.' });
     } catch (error: any) {

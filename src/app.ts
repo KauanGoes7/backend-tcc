@@ -16,7 +16,7 @@ app.use(express.json()); // Para parsear JSON no corpo da requisição
 app.use(cors()); // Habilita o CORS
 
 // Rotas da API
-app.use('/api/auth', authRoutes);
+app.use('/api/users', authRoutes); // <-- CORREÇÃO AQUI: Mudado de '/api/auth' para '/api/users'
 app.use('/api/services', serviceRoutes); 
 app.use('/api/barbers', barberRoutes);
 app.use('/api/appointments', appointmentRoutes); // Use a rota para /api/appointments

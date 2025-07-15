@@ -14,19 +14,21 @@ const isWithinOneMonth = (dia: number, mes: number): boolean => {
 
     // Se o agendamento for para um ano futuro, ou se o mês for mais de um mês à frente
     // Ajustar o ano do agendamento se o mês for anterior ao atual (mas em um ciclo de agendamento válido)
-    if (mes < todayMonth) {
+    if (mes < todayMonth && todayMonth === 12 && mes === 1) { // Lida com agendamentos de dezembro para janeiro do próximo ano
         appointmentDate.setFullYear(todayYear + 1);
+    } else if (mes < todayMonth && !(todayMonth === 12 && mes === 1)) {
+        // Se o mês do agendamento for menor que o mês atual e não for virada de ano, é um mês passado.
+        return false; // Não pode agendar no passado
     }
     
     // Calcula a data limite (1 mês a partir de hoje)
-    const oneMonthFromNow = new Date(todayYear, todayMonth, todayDay); // Usa o mês atual para evitar problemas de "data inexistente" (ex: Jan 31 + 1 mês não é Fev 31)
+    const oneMonthFromNow = new Date(todayYear, todayMonth, todayDay); 
     oneMonthFromNow.setMonth(oneMonthFromNow.getMonth() + 1);
     
     // Zera horas, minutos, segundos e milissegundos para comparação precisa de datas
     today.setHours(0, 0, 0, 0);
     appointmentDate.setHours(0, 0, 0, 0);
     oneMonthFromNow.setHours(0, 0, 0, 0);
-
 
     // O agendamento deve ser no futuro ou hoje, e dentro do limite de 1 mês
     return appointmentDate >= today && appointmentDate <= oneMonthFromNow;
@@ -40,13 +42,13 @@ export const createAppointment = async (req: Request, res: Response) => {
     const { dia, mes, servicoId, barbeiroId } = req.body;
     const userId = req.user?.id; // Obtém o ID do usuário autenticado do req.user
 
-    if (!userId || !dia || !mes || !servicoId || !barbeiroId) {
-        return res.status(400).json({ message: 'Todos os campos (dia, mês, serviço, barbeiro) são obrigatórios.' });
+    if (userId === undefined || !dia || !mes || !servicoId || !barbeiroId) { // Adicionado verificação para userId undefined
+        return res.status(400).json({ message: 'Todos os campos (dia, mês, serviço, barbeiro) são obrigatórios e o usuário deve estar autenticado.' });
     }
 
     // Validação da data
     if (!isWithinOneMonth(dia, mes)) {
-        return res.status(400).json({ message: 'Agendamentos depois de 1 mês somente pelo WhatsApp.' });
+        return res.status(400).json({ message: 'Agendamentos depois de 1 mês somente pelo WhatsApp ou data inválida/passada.' });
     }
     
     // Validação de dia e mês básicos (poderia ser mais robusta, ex: dias por mês)
@@ -56,6 +58,7 @@ export const createAppointment = async (req: Request, res: Response) => {
 
     try {
         // Verificar se o usuário, serviço e barbeiro existem
+        // IDs são Int para SQLite. req.user?.id já deve ser number.
         const userExists = await prisma.user.findUnique({ where: { id: userId } });
         const serviceExists = await prisma.service.findUnique({ where: { id: servicoId } });
         const barberExists = await prisma.barber.findUnique({ where: { id: barbeiroId } });
@@ -64,9 +67,7 @@ export const createAppointment = async (req: Request, res: Response) => {
         if (!serviceExists) return res.status(404).json({ message: 'Serviço não encontrado.' });
         if (!barberExists) return res.status(404).json({ message: 'Barbeiro não encontrado.' });
 
-        // Opcional: Verificar disponibilidade do barbeiro para a data e hora (se tivesse hora)
-        // Por exemplo, você pode querer adicionar um campo 'hora' ao agendamento para evitar conflitos de horário.
-        // Se um barbeiro só puder ter 1 agendamento por dia, você poderia verificar:
+        // Verificar disponibilidade do barbeiro para a data
         const existingAppointment = await prisma.appointment.findFirst({
              where: {
                  barbeiroId: barbeiroId,
@@ -84,7 +85,7 @@ export const createAppointment = async (req: Request, res: Response) => {
             data: {
                 dia,
                 mes,
-                usuarioId: userId,
+                usuarioId: userId, // userId já deve ser number se veio de req.user.id do SQLite
                 servicoId: servicoId,
                 barbeiroId: barbeiroId
             },
@@ -106,15 +107,15 @@ export const createAppointment = async (req: Request, res: Response) => {
 // @route   GET /api/appointments
 // @access  Private
 export const getMyAppointments = async (req: Request, res: Response) => {
-    const userId = req.user?.id; // Obtém o ID do usuário autenticado
+    const userId = req.user?.id; // Obtém o ID do usuário autenticado (Int para SQLite)
 
-    if (!userId) {
+    if (userId === undefined) { // Verificação para number/undefined
         return res.status(401).json({ message: 'Não autorizado. ID do usuário ausente.' });
     }
 
     try {
         const appointments = await prisma.appointment.findMany({
-            where: { usuarioId: userId },
+            where: { usuarioId: userId }, // Comparação com Int
             include: {
                 usuario: { select: { nome: true, email: true } },
                 servico: { select: { nomeServico: true, tema: true } },
@@ -136,13 +137,19 @@ export const getAppointmentById = async (req: Request, res: Response) => {
     const { id } = req.params;
     const userId = req.user?.id;
 
-    if (!userId) {
+    if (userId === undefined) {
         return res.status(401).json({ message: 'Não autorizado. ID do usuário ausente.' });
     }
 
     try {
+        // ID do parâmetro da URL é string, precisa converter para Int para o Prisma com SQLite
+        const appointmentId = parseInt(id); // <-- CORREÇÃO: Conversão de string para number
+        if (isNaN(appointmentId)) { // <-- Boa prática: verifica se a conversão foi bem-sucedida
+            return res.status(400).json({ message: 'ID de agendamento inválido.' });
+        }
+
         const appointment = await prisma.appointment.findUnique({
-            where: { id: id },
+            where: { id: appointmentId }, // <-- Usando o ID convertido
             include: {
                 usuario: { select: { nome: true, email: true } },
                 servico: { select: { nomeServico: true, tema: true } },
@@ -174,7 +181,7 @@ export const updateAppointment = async (req: Request, res: Response) => {
     const { dia, mes, servicoId, barbeiroId } = req.body;
     const userId = req.user?.id;
 
-    if (!userId) {
+    if (userId === undefined) {
         return res.status(401).json({ message: 'Não autorizado. ID do usuário ausente.' });
     }
 
@@ -183,7 +190,13 @@ export const updateAppointment = async (req: Request, res: Response) => {
     }
 
     try {
-        const existingAppointment = await prisma.appointment.findUnique({ where: { id: id } });
+        // ID do parâmetro da URL é string, precisa converter para Int para o Prisma com SQLite
+        const appointmentId = parseInt(id); // <-- CORREÇÃO: Conversão de string para number
+        if (isNaN(appointmentId)) { // <-- Boa prática: verifica se a conversão foi bem-sucedida
+            return res.status(400).json({ message: 'ID de agendamento inválido.' });
+        }
+
+        const existingAppointment = await prisma.appointment.findUnique({ where: { id: appointmentId } }); // <-- Usando o ID convertido
 
         if (!existingAppointment) {
             return res.status(404).json({ message: 'Agendamento não encontrado.' });
@@ -197,10 +210,10 @@ export const updateAppointment = async (req: Request, res: Response) => {
         // Validação da nova data, se fornecida
         if (dia !== undefined || mes !== undefined) {
             const updatedDia = dia !== undefined ? dia : existingAppointment.dia;
-            const updatedMes = mes !== undefined ? mes : existingAppointment.mes;
+            const updatedMes = mes !== undefined ? mes : existingAppointment.mes; // <-- CORREÇÃO: troquei existingAppointment.dia por existingAppointment.mes
 
             if (!isWithinOneMonth(updatedDia, updatedMes)) {
-                return res.status(400).json({ message: 'Agendamentos depois de 1 mês somente pelo WhatsApp.' });
+                return res.status(400).json({ message: 'Agendamentos depois de 1 mês somente pelo WhatsApp ou data inválida/passada.' });
             }
             if (updatedDia < 1 || updatedDia > 31 || updatedMes < 1 || updatedMes > 12) {
                 return res.status(400).json({ message: 'Dia ou mês inválido na atualização.' });
@@ -224,7 +237,7 @@ export const updateAppointment = async (req: Request, res: Response) => {
             (barbeiroId !== undefined && barbeiroId !== existingAppointment.barbeiroId)) {
             
             const targetDia = dia !== undefined ? dia : existingAppointment.dia;
-            const targetMes = mes !== undefined ? mes : existingAppointment.dia;
+            const targetMes = mes !== undefined ? mes : existingAppointment.mes; // Mantido como existingAppointment.mes
             const targetBarberId = barbeiroId !== undefined ? barbeiroId : existingAppointment.barbeiroId;
 
             const conflictAppointment = await prisma.appointment.findFirst({
@@ -242,7 +255,7 @@ export const updateAppointment = async (req: Request, res: Response) => {
         }
 
         const updatedAppointment = await prisma.appointment.update({
-            where: { id: id },
+            where: { id: appointmentId }, // <-- Usando o ID convertido
             data: {
                 dia,
                 mes,
@@ -273,12 +286,18 @@ export const deleteAppointment = async (req: Request, res: Response) => {
     const { id } = req.params;
     const userId = req.user?.id;
 
-    if (!userId) {
+    if (userId === undefined) {
         return res.status(401).json({ message: 'Não autorizado. ID do usuário ausente.' });
     }
 
     try {
-        const existingAppointment = await prisma.appointment.findUnique({ where: { id: id } });
+        // ID do parâmetro da URL é string, precisa converter para Int para o Prisma com SQLite
+        const appointmentId = parseInt(id); // <-- CORREÇÃO: Conversão de string para number
+        if (isNaN(appointmentId)) { // <-- Boa prática: verifica se a conversão foi bem-sucedida
+            return res.status(400).json({ message: 'ID de agendamento inválido.' });
+        }
+
+        const existingAppointment = await prisma.appointment.findUnique({ where: { id: appointmentId } }); // <-- Usando o ID convertido
 
         if (!existingAppointment) {
             return res.status(404).json({ message: 'Agendamento não encontrado.' });
@@ -290,7 +309,7 @@ export const deleteAppointment = async (req: Request, res: Response) => {
         }
 
         await prisma.appointment.delete({
-            where: { id: id },
+            where: { id: appointmentId }, // <-- Usando o ID convertido
         });
         res.status(200).json({ message: 'Agendamento deletado com sucesso.' });
     } catch (error: any) {

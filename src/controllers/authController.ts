@@ -37,13 +37,23 @@ export const registerUser = async (req: Request, res: Response) => {
             select: { id: true, nome: true, email: true } // Não retornar a senha
         });
 
-        res.status(201).json({
-            id: user.id,
-            nome: user.nome,
-            email: user.email,
-            token: generateToken(user.id),
-        });
+        // Linha 44 (ou similar)
+res.status(201).json({
+    id: user.id,
+    nome: user.nome,
+    email: user.email,
+    token: generateToken(user.id.toString()), // <-- Adicione .toString() aqui
+});
 
+// ...
+
+// Linha 85 (ou similar)
+res.json({
+    id: user.id,
+    nome: user.nome,
+    email: user.email,
+    token: generateToken(user.id.toString()), // <-- Adicione .toString() aqui
+});
     } catch (error: any) {
         console.error(error);
         res.status(500).json({ message: 'Erro ao registrar usuário.', error: error.message });
@@ -79,11 +89,11 @@ export const loginUser = async (req: Request, res: Response) => {
         }
 
         res.json({
-            id: user.id,
-            nome: user.nome,
-            email: user.email,
-            token: generateToken(user.id),
-        });
+    id: user.id,
+    nome: user.nome,
+    email: user.email,
+    token: generateToken(user.id.toString()), // <-- Adicione .toString() aqui
+});
 
     } catch (error: any) {
         console.error(error);

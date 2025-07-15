@@ -1,67 +1,60 @@
 // src/utils/authMiddleware.ts
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { jwtSecret } from './auth'; // Caminho ajustado
-import prisma from './prisma'; // Importa a instância do Prisma Client
-import { User } from '@prisma/client'; // Importa o tipo User do Prisma Client
+import { jwtSecret, DecodedToken } from './auth';
+import prisma from './prisma';
 
-// Define um tipo seguro para o usuário, sem senha e datas sensíveis
-export type SafeUser = Pick<User, 'id' | 'nome' | 'email'>;
-
-// A interface DecodedToken deve refletir o tipo do ID no seu banco de dados
-// Se o ID no Prisma é Int, então decoded.id deve ser number
-interface DecodedToken {
-    id: number; // <-- CORREÇÃO: id agora é number
-    iat: number;
-    exp: number;
-}
-
-// Estende a interface Request do Express para incluir a propriedade 'user'
 declare global {
     namespace Express {
         interface Request {
-            user?: SafeUser; // Opcional, pois pode não estar autenticado em todas as rotas
+            user?: {
+                id: number;
+                email: string;
+            };
         }
     }
 }
 
-export const protect = async (req: Request, res: Response, next: NextFunction) => {
-    let token: string | undefined;
+export const authMiddleware = async (req: Request, res: Response, next: NextFunction) => {
+    const authHeader = req.headers.authorization;
 
-    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-        try {
-            token = req.headers.authorization.split(' ')[1]; // Pega o token após "Bearer "
+    if (!authHeader) {
+        return res.status(401).json({ message: 'Token não fornecido.' });
+    }
 
-            // Verifica e decodifica o token. O 'id' será interpretado como number
-            const decoded = jwt.verify(token, jwtSecret) as DecodedToken;
+    const token = authHeader.split(' ')[1];
 
-            // Buscar o usuário pelo ID do token, mas SEM a senha
-            // decoded.id já é number devido à interface DecodedToken
-            const user = await prisma.user.findUnique({
-                where: { id: decoded.id }, // decoded.id agora é number, sem necessidade de parseInt
-                select: { id: true, nome: true, email: true } // Seleciona apenas o que é seguro expor
-            });
+    if (!token) {
+        return res.status(401).json({ message: 'Formato de token inválido.' });
+    }
 
-            if (!user) {
-                return res.status(401).json({ message: 'Não autorizado, token falhou (usuário não encontrado).' });
-            }
-
-            // Anexar o usuário à requisição para uso em rotas posteriores
-            req.user = user; 
-
-            next(); // Prossegue para a próxima função middleware/rota
-        } catch (error) {
-            console.error("Erro na autenticação:", error);
-            // Verifica se o erro é de TokenExpiredError ou JsonWebTokenError
-            if (error instanceof jwt.TokenExpiredError) {
-                return res.status(401).json({ message: 'Não autorizado, token expirado.' });
-            }
-            if (error instanceof jwt.JsonWebTokenError) {
-                return res.status(401).json({ message: 'Não autorizado, token inválido.' });
-            }
-            res.status(401).json({ message: 'Não autorizado, erro de autenticação desconhecido.' });
+    try {
+        const decoded = jwt.verify(token, jwtSecret) as DecodedToken;
+        const userId = parseInt(decoded.id, 10); 
+        
+        if (isNaN(userId)) {
+            return res.status(401).json({ message: 'Token inválido: ID do usuário não é um número válido.' });
         }
-    } else { // Movido o bloco de verificação de token ausente para um 'else' ou 'if (!token)' no final
-        res.status(401).json({ message: 'Não autorizado, nenhum token fornecido.' });
+
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { id: true, email: true },
+        });
+
+        if (!user) {
+            return res.status(404).json({ message: 'Usuário não encontrado.' });
+        }
+
+        req.user = user;
+        next();
+    } catch (error) {
+        if (error instanceof jwt.TokenExpiredError) {
+            return res.status(401).json({ message: 'Token expirado.' });
+        }
+        if (error instanceof jwt.JsonWebTokenError) {
+            return res.status(401).json({ message: 'Token inválido.' });
+        }
+        console.error('Erro na autenticação:', error);
+        return res.status(500).json({ message: 'Erro interno do servidor.' });
     }
 };

@@ -1,24 +1,15 @@
 // src/routes/appointmentRoutes.ts
 import { Router } from 'express';
-import { 
-    createAppointment, 
-    getMyAppointments, 
-    getAppointmentById, 
-    updateAppointment, 
-    deleteAppointment 
-} from '../controllers/appointmentController';
-import { protect } from '../utils/authMiddleware';
+import { createAppointment, getUserAppointments, getAppointmentById, updateAppointment, deleteAppointment } from '../controllers/appointmentController';
+// Certifique-se de que authMiddleware está sendo importado corretamente
+import { authMiddleware } from '../utils/authMiddleware';
 
 const router = Router();
 
-// Todas as rotas de agendamento exigirão que o usuário esteja autenticado
-router.route('/')
-    .post(protect, createAppointment)   // Criar agendamento
-    .get(protect, getMyAppointments); // Listar agendamentos do usuário logado
-
-router.route('/:id')
-    .get(protect, getAppointmentById)   // Obter agendamento por ID (do usuário logado)
-    .put(protect, updateAppointment)    // Atualizar agendamento (do usuário logado)
-    .delete(protect, deleteAppointment); // Deletar agendamento (do usuário logado)
+router.post('/', authMiddleware, createAppointment);
+router.get('/', authMiddleware, getUserAppointments);
+router.get('/:id', authMiddleware, getAppointmentById);
+router.put('/:id', authMiddleware, updateAppointment);
+router.delete('/:id', authMiddleware, deleteAppointment);
 
 export default router;

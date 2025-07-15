@@ -1,24 +1,15 @@
 // src/routes/barberRoutes.ts
 import { Router } from 'express';
-import { 
-    createBarber, 
-    getBarbers, 
-    getBarberById, 
-    updateBarber, 
-    deleteBarber 
-} from '../controllers/barberController';
-import { protect } from '../utils/authMiddleware'; // Exemplo de como usar o middleware
+import { createBarber, getAllBarbers, getBarberById, updateBarber, deleteBarber } from '../controllers/barberController';
+// Certifique-se de que authMiddleware está sendo importado corretamente
+import { authMiddleware } from '../utils/authMiddleware'; 
 
 const router = Router();
 
-// Rotas CRUD para Barbeiros
-router.route('/')
-    .post(protect, createBarber) // Ex: Apenas usuário autenticado pode criar
-    .get(getBarbers);   // Listar todos os barbeiros (pode ser público)
-
-router.route('/:id')
-    .get(getBarberById)   // Obter barbeiro por ID (pode ser público)
-    .put(protect, updateBarber)    // Ex: Apenas usuário autenticado pode atualizar
-    .delete(protect, deleteBarber); // Ex: Apenas usuário autenticado pode deletar
+router.post('/', authMiddleware, createBarber);
+router.get('/', authMiddleware, getAllBarbers);
+router.get('/:id', authMiddleware, getBarberById);
+router.put('/:id', authMiddleware, updateBarber);
+router.delete('/:id', authMiddleware, deleteBarber);
 
 export default router;

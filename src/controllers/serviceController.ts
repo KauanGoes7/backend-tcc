@@ -2,9 +2,6 @@
 import { Request, Response } from 'express';
 import prisma from '../utils/prisma';
 
-// @desc    Criar um novo serviço
-// @route   POST /api/services
-// @access  Private (proteger com authMiddleware)
 export const createService = async (req: Request, res: Response) => {
     const { tema, nomeServico } = req.body;
 
@@ -12,123 +9,104 @@ export const createService = async (req: Request, res: Response) => {
         return res.status(400).json({ message: 'Tema e nome do serviço são obrigatórios.' });
     }
 
-    const temasValidos = ['Cabelo', 'Barba', 'Cabelo + Barba'];
-    if (!temasValidos.includes(tema)) {
-        return res.status(400).json({ message: `Tema inválido. Use: ${temasValidos.join(', ')}` });
-    }
-
     try {
-        const service = await prisma.service.create({
+        const newService = await prisma.servico.create({ // CORRIGIDO: de prisma.service para prisma.servico
             data: {
                 tema,
-                nomeServico
-            }
+                nomeServico,
+            },
         });
-        res.status(201).json(service);
+        res.status(201).json(newService);
     } catch (error: any) {
-        console.error("Erro ao criar serviço:", error);
-        res.status(500).json({ message: 'Erro ao criar serviço.', error: error.message });
-    }
-};
-
-// @desc    Listar todos os serviços
-// @route   GET /api/services
-// @access  Public
-export const getServices = async (req: Request, res: Response) => {
-    try {
-        const services = await prisma.service.findMany();
-        res.status(200).json(services);
-    } catch (error: any) {
-        console.error("Erro ao listar serviços:", error);
-        res.status(500).json({ message: 'Erro ao listar serviços.', error: error.message });
-    }
-};
-
-// @desc    Obter um serviço específico
-// @route   GET /api/services/:id
-// @access  Public
-export const getServiceById = async (req: Request, res: Response) => {
-    const { id } = req.params;
-
-    try {
-        // ID do parâmetro da URL é string, precisa converter para Int para o Prisma com SQLite
-        const serviceId = parseInt(id); // <-- CORREÇÃO: Conversão de string para number
-        if (isNaN(serviceId)) { // <-- Boa prática: verifica se a conversão foi bem-sucedida
-            return res.status(400).json({ message: 'ID de serviço inválido.' });
+        console.error('Erro ao criar serviço:', error);
+        if (error.code === 'P2002') { 
+            return res.status(409).json({ message: 'Já existe um serviço com este nome.' });
         }
+        res.status(500).json({ message: 'Erro interno do servidor ao criar serviço.' });
+    }
+};
 
-        const service = await prisma.service.findUnique({
-            where: { id: serviceId } // <-- Usando o ID convertido
+export const getAllServices = async (req: Request, res: Response) => {
+    try {
+        const services = await prisma.servico.findMany(); // CORRIGIDO: de prisma.service para prisma.servico
+        res.status(200).json(services);
+    } catch (error) {
+        console.error('Erro ao buscar serviços:', error);
+        res.status(500).json({ message: 'Erro interno do servidor ao buscar serviços.' });
+    }
+};
+
+export const getServiceById = async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id as string, 10); 
+
+    if (isNaN(id)) {
+        return res.status(400).json({ message: 'ID de serviço inválido.' });
+    }
+
+    try {
+        const service = await prisma.servico.findUnique({ // CORRIGIDO: de prisma.service para prisma.servico
+            where: { id },
         });
 
         if (!service) {
             return res.status(404).json({ message: 'Serviço não encontrado.' });
         }
         res.status(200).json(service);
-    } catch (error: any) {
-        console.error("Erro ao obter serviço:", error);
-        res.status(500).json({ message: 'Erro ao obter serviço.', error: error.message });
+    } catch (error) {
+        console.error('Erro ao buscar serviço por ID:', error);
+        res.status(500).json({ message: 'Erro interno do servidor ao buscar serviço.' });
     }
 };
 
-// @desc    Atualizar um serviço
-// @route   PUT /api/services/:id
-// @access  Private (proteger com authMiddleware)
 export const updateService = async (req: Request, res: Response) => {
-    const { id } = req.params;
+    const id = parseInt(req.params.id as string, 10); 
     const { tema, nomeServico } = req.body;
 
-    const temasValidos = ['Cabelo', 'Barba', 'Cabelo + Barba'];
-    if (tema && !temasValidos.includes(tema)) {
-        return res.status(400).json({ message: `Tema inválido. Use: ${temasValidos.join(', ')}` });
+    if (isNaN(id)) {
+        return res.status(400).json({ message: 'ID de serviço inválido.' });
+    }
+    if (!tema && !nomeServico) {
+        return res.status(400).json({ message: 'Pelo menos um campo (tema ou nomeServico) deve ser fornecido para atualização.' });
     }
 
     try {
-        // ID do parâmetro da URL é string, precisa converter para Int para o Prisma com SQLite
-        const serviceId = parseInt(id); // <-- CORREÇÃO: Conversão de string para number
-        if (isNaN(serviceId)) { // <-- Boa prática: verifica se a conversão foi bem-sucedida
-            return res.status(400).json({ message: 'ID de serviço inválido.' });
-        }
-
-        const updatedService = await prisma.service.update({
-            where: { id: serviceId }, // <-- Usando o ID convertido
-            data: {
-                tema,
-                nomeServico
-            }
+        const updatedService = await prisma.servico.update({ // CORRIGIDO: de prisma.service para prisma.servico
+            where: { id },
+            data: { tema, nomeServico },
         });
         res.status(200).json(updatedService);
     } catch (error: any) {
-        if (error.code === 'P2025' || error.message.includes('No Service found')) {
+        console.error('Erro ao atualizar serviço:', error);
+        if (error.code === 'P2025') { 
             return res.status(404).json({ message: 'Serviço não encontrado para atualização.' });
         }
-        console.error("Erro ao atualizar serviço:", error);
-        res.status(500).json({ message: 'Erro ao atualizar serviço.', error: error.message });
+        if (error.code === 'P2002') { 
+            return res.status(409).json({ message: 'Já existe outro serviço com este nome.' });
+        }
+        res.status(500).json({ message: 'Erro interno do servidor ao atualizar serviço.' });
     }
 };
 
-// @desc    Deletar um serviço
-// @route   DELETE /api/services/:id
-// @access  Private (proteger com authMiddleware)
 export const deleteService = async (req: Request, res: Response) => {
-    const { id } = req.params;
+    const id = parseInt(req.params.id as string, 10); 
+
+    if (isNaN(id)) {
+        return res.status(400).json({ message: 'ID de serviço inválido.' });
+    }
 
     try {
-        // ID do parâmetro da URL é string, precisa converter para Int para o Prisma com SQLite
-        const serviceId = parseInt(id); // <-- CORREÇÃO: Conversão de string para number
-        if (isNaN(serviceId)) { // <-- Boa prática: verifica se a conversão foi bem-sucedida
-            return res.status(400).json({ message: 'ID de serviço inválido.' });
-        }
-
-        await prisma.service.delete({
-            where: { id: serviceId }, // <-- Usando o ID convertido
+        await prisma.servico.delete({ // CORRIGIDO: de prisma.service para prisma.servico
+            where: { id },
         });
-        res.status(200).json({ message: 'Serviço deletado com sucesso.' });
+        res.status(204).send();
     } catch (error: any) {
-        if (error.code === 'P2025' || error.message.includes('No Service found')) {
+        console.error('Erro ao deletar serviço:', error);
+        if (error.code === 'P2025') { 
             return res.status(404).json({ message: 'Serviço não encontrado para exclusão.' });
         }
-        console.error("Erro ao deletar serviço:", error);
-        res.status(500).json({ message: 'Erro ao deletar serviço.', error: error.message });
+        if (error.code === 'P2003') {
+            return res.status(409).json({ message: 'Não é possível deletar serviço com agendamentos existentes.' });
+        }
+        res.status(500).json({ message: 'Erro interno do servidor ao deletar serviço.' });
     }
 };

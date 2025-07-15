@@ -1,107 +1,87 @@
 // src/controllers/authController.ts
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import { jwtSecret, jwtExpiresIn } from '../utils/auth'; // Caminho ajustado
 import prisma from '../utils/prisma';
+import { generateToken } from '../utils/auth';
 
-// @desc    Registrar um novo usuário
-// @route   POST /api/auth/register
-// @access  Public
 export const registerUser = async (req: Request, res: Response) => {
-    const { nome, email, senha } = req.body;
+    const { name, email, password } = req.body;
 
-    if (!nome || !email || !senha) {
+    if (!name || !email || !password) {
         return res.status(400).json({ message: 'Por favor, preencha todos os campos.' });
     }
 
     try {
-        // Verificar se o usuário já existe
         const userExists = await prisma.user.findUnique({ where: { email } });
 
         if (userExists) {
-            return res.status(400).json({ message: 'Usuário já existe com este e-mail.' });
+            return res.status(409).json({ message: 'Usuário já existe com este email.' });
         }
 
-        // Criptografar a senha
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(senha, salt);
+        const hashedPassword = await bcrypt.hash(password, 10);
 
-        // Criar o usuário
-        const user = await prisma.user.create({
+        const newUser = await prisma.user.create({
             data: {
-                nome,
+                name,
                 email,
-                senha: hashedPassword,
+                password: hashedPassword,
             },
-            select: { id: true, nome: true, email: true } // Não retornar a senha
         });
 
-        // Linha 44 (ou similar)
-res.status(201).json({
-    id: user.id,
-    nome: user.nome,
-    email: user.email,
-    token: generateToken(user.id.toString()), // <-- Adicione .toString() aqui
-});
+        const token = generateToken(newUser.id);
 
-// ...
-
-// Linha 85 (ou similar)
-res.json({
-    id: user.id,
-    nome: user.nome,
-    email: user.email,
-    token: generateToken(user.id.toString()), // <-- Adicione .toString() aqui
-});
-    } catch (error: any) {
-        console.error(error);
-        res.status(500).json({ message: 'Erro ao registrar usuário.', error: error.message });
+        res.status(201).json({
+            message: 'Usuário registrado com sucesso!',
+            user: {
+                id: newUser.id,
+                name: newUser.name, // Incluir o nome aqui
+                email: newUser.email,
+            },
+            token,
+        });
+    } catch (error) {
+        console.error('Erro ao registrar usuário:', error);
+        res.status(500).json({ message: 'Erro interno do servidor ao registrar usuário.' });
     }
 };
 
-// @desc    Autenticar um usuário e obter token
-// @route   POST /api/auth/login
-// @access  Public
 export const loginUser = async (req: Request, res: Response) => {
-    const { email, senha } = req.body;
+    const { email, password } = req.body; // A senha enviada está em 'password'
 
-    if (!email || !senha) {
-        return res.status(400).json({ message: 'Por favor, preencha todos os campos.' });
+    if (!email || !password) {
+        return res.status(400).json({ message: 'Por favor, preencha email e senha.' });
     }
 
     try {
-        // Encontrar o usuário e incluir a senha para comparação (select: true no query)
         const user = await prisma.user.findUnique({
             where: { email },
-            select: { id: true, nome: true, email: true, senha: true } // Explicitamente selecionar a senha
+            select: { id: true, name: true, email: true, password: true }, // CORRIGIDO: Selecionar o password para comparação
         });
 
         if (!user) {
-            return res.status(401).json({ message: 'Credenciais inválidas.' });
+            return res.status(401).json({ message: 'Credenciais inválidas: Email ou senha incorretos.' });
         }
 
-        // Comparar senhas
-        const isMatch = await bcrypt.compare(senha, user.senha);
+        // CORRIGIDO: Comparar a senha fornecida (password) com a senha do banco de dados (user.password)
+        const isMatch = await bcrypt.compare(password, user.password); 
 
         if (!isMatch) {
-            return res.status(401).json({ message: 'Credenciais inválidas.' });
+            return res.status(401).json({ message: 'Credenciais inválidas: Email ou senha incorretos.' });
         }
 
-        res.json({
-    id: user.id,
-    nome: user.nome,
-    email: user.email,
-    token: generateToken(user.id.toString()), // <-- Adicione .toString() aqui
-});
+        const token = generateToken(user.id);
 
-    } catch (error: any) {
-        console.error(error);
-        res.status(500).json({ message: 'Erro ao fazer login.', error: error.message });
+        res.status(200).json({
+            message: 'Login bem-sucedido!',
+            user: {
+                id: user.id,
+                name: user.name, // Incluir o nome aqui
+                email: user.email,
+            },
+            token,
+        });
+    } catch (error) {
+        console.error('Erro ao fazer login:', error);
+        res.status(500).json({ message: 'Erro interno do servidor ao fazer login.' });
     }
-};
-
-// Gerar JWT
-const generateToken = (id: string): string => {
-    return jwt.sign({ id }, jwtSecret, { expiresIn: jwtExpiresIn });
 };

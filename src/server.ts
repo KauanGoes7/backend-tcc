@@ -1,26 +1,42 @@
 // src/server.ts
-import app from './app';
-import prisma from './utils/prisma'; // Importa a instância do Prisma Client
+import express from 'express';
+import dotenv from 'dotenv';
+import cors from 'cors';
+import authRoutes from './routes/authRoutes';
+import barberRoutes from './routes/barberRoutes';
+import serviceRoutes from './routes/serviceRoutes';
+import appointmentRoutes from './routes/appointmentRoutes';
+import prisma from './utils/prisma'; 
+
+dotenv.config();
+
+const app = express();
+app.use(express.json());
+app.use(cors());
+
+// Conectar ao banco de dados Prisma
+prisma.$connect()
+  .then(() => {
+    console.log('Conectado ao banco de dados com Prisma.');
+  })
+  .catch((e) => {
+    console.error('Erro ao conectar ao banco de dados:', e);
+    process.exit(1); 
+  });
+
+// Rotas
+app.use('/auth', authRoutes); // Rota para autenticação (registro e login)
+app.use('/barbeiros', barberRoutes); // Rotas para Barbeiro
+app.use('/servicos', serviceRoutes);   // Rotas para Serviço
+app.use('/agendamentos', appointmentRoutes); // Rotas para Agendamento
+
+// Rota de teste simples
+app.get('/', (req, res) => {
+    res.send('API da Barbearia está rodando!');
+});
 
 const PORT = process.env.PORT || 3000;
-
-const startServer = async () => {
-    try {
-        // Conectar ao banco de dados usando Prisma (implicitamente via `prisma.$connect()`)
-        await prisma.$connect();
-        console.log('Conectado ao banco de dados com Prisma.');
-
-        app.listen(PORT, () => {
-            console.log(`Servidor rodando na porta ${PORT}`);
-            console.log(`Acesse: http://localhost:${PORT}`);
-        });
-    } catch (error) {
-        console.error('Erro ao conectar ao banco de dados ou iniciar o servidor:', error);
-        process.exit(1); // Sai do processo com erro
-    } finally {
-        // Opcional: desconectar Prisma em caso de encerramento limpo (não necessário para apps em execução)
-        // await prisma.$disconnect();
-    }
-};
-
-startServer();
+app.listen(PORT, () => {
+    console.log(`Servidor rodando na porta ${PORT}`);
+    console.log(`Acesse: http://localhost:${PORT}`);
+});

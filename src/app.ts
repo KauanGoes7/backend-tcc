@@ -1,29 +1,42 @@
-// src/app.ts
+// src/server.ts (ou app.ts) - Exemplo, seu arquivo pode ter outras coisas
 import express from 'express';
-import cors from 'cors';
 import dotenv from 'dotenv';
-import authRoutes from './routes/authRoutes';
-import serviceRoutes from './routes/serviceRoutes'; 
+import cors from 'cors';
+import authRoutes from './routes/authRoutes'; // As rotas de autenticação (register/login)
 import barberRoutes from './routes/barberRoutes';
-import appointmentRoutes from './routes/appointmentRoutes'; // Importe as rotas de agendamento
+import serviceRoutes from './routes/serviceRoutes';
+import appointmentRoutes from './routes/appointmentRoutes';
+import prisma from './utils/prisma'; // Importa a instância do Prisma Client
 
 dotenv.config();
 
 const app = express();
+app.use(express.json());
+app.use(cors());
 
-// Middlewares
-app.use(express.json()); // Para parsear JSON no corpo da requisição
-app.use(cors()); // Habilita o CORS
+// Conectar ao banco de dados Prisma
+prisma.$connect()
+  .then(() => {
+    console.log('Conectado ao banco de dados com Prisma.');
+  })
+  .catch((e) => {
+    console.error('Erro ao conectar ao banco de dados:', e);
+    process.exit(1); // Sai da aplicação se não conseguir conectar
+  });
 
-// Rotas da API
-app.use('/api/users', authRoutes); // <-- CORREÇÃO AQUI: Mudado de '/api/auth' para '/api/users'
-app.use('/api/services', serviceRoutes); 
-app.use('/api/barbers', barberRoutes);
-app.use('/api/appointments', appointmentRoutes); // Use a rota para /api/appointments
+// Rotas
+app.use('/auth', authRoutes); // Prefira /auth para autenticação, como nos exemplos do Postman
+app.use('/barbeiros', barberRoutes); // Ou '/barbers' se preferir
+app.use('/servicos', serviceRoutes); // Ou '/services' se preferir
+app.use('/agendamentos', appointmentRoutes); // Ou '/appointments' se preferir
 
 // Rota de teste
 app.get('/', (req, res) => {
-    res.send('API de Agendamento está rodando!');
+    res.send('API da Barbearia está rodando!');
 });
 
-export default app;
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`Servidor rodando na porta ${PORT}`);
+    console.log(`Acesse: http://localhost:${PORT}`);
+});

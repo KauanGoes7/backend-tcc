@@ -2,125 +2,110 @@
 import { Request, Response } from 'express';
 import prisma from '../utils/prisma';
 
-// @desc    Criar um novo barbeiro
-// @route   POST /api/barbers
-// @access  Private (proteger com authMiddleware)
 export const createBarber = async (req: Request, res: Response) => {
     const { nomeBarbeiro } = req.body;
 
     if (!nomeBarbeiro) {
-        return res.status(400).json({ message: 'O nome do barbeiro é obrigatório.' });
+        return res.status(400).json({ message: 'Nome do barbeiro é obrigatório.' });
     }
 
     try {
-        const barber = await prisma.barber.create({
+        const newBarber = await prisma.barbeiro.create({ // CORRIGIDO: de prisma.barber para prisma.barbeiro
             data: {
-                nomeBarbeiro
-            }
+                nomeBarbeiro,
+            },
         });
-        res.status(201).json(barber);
+        res.status(201).json(newBarber);
     } catch (error: any) {
-        console.error("Erro ao criar barbeiro:", error);
-        res.status(500).json({ message: 'Erro ao criar barbeiro.', error: error.message });
-    }
-};
-
-// @desc    Listar todos os barbeiros
-// @route   GET /api/barbers
-// @access  Public
-export const getBarbers = async (req: Request, res: Response) => {
-    try {
-        const barbers = await prisma.barber.findMany();
-        res.status(200).json(barbers);
-    } catch (error: any) {
-        console.error("Erro ao listar barbeiros:", error);
-        res.status(500).json({ message: 'Erro ao listar barbeiros.', error: error.message });
-    }
-};
-
-// @desc    Obter um barbeiro específico
-// @route   GET /api/barbers/:id
-// @access  Public
-export const getBarberById = async (req: Request, res: Response) => {
-    const { id } = req.params;
-
-    try {
-        // ID do parâmetro da URL é string, precisa converter para Int para o Prisma com SQLite
-        const barberId = parseInt(id); // <-- CORREÇÃO: Conversão de string para number
-        if (isNaN(barberId)) { // <-- Boa prática: verifica se a conversão foi bem-sucedida
-            return res.status(400).json({ message: 'ID de barbeiro inválido.' });
+        console.error('Erro ao criar barbeiro:', error);
+        if (error.code === 'P2002') { 
+            return res.status(409).json({ message: 'Já existe um barbeiro com este nome.' });
         }
+        res.status(500).json({ message: 'Erro interno do servidor ao criar barbeiro.' });
+    }
+};
 
-        const barber = await prisma.barber.findUnique({
-            where: { id: barberId } // <-- Usando o ID convertido
+export const getAllBarbers = async (req: Request, res: Response) => {
+    try {
+        const barbers = await prisma.barbeiro.findMany(); // CORRIGIDO: de prisma.barber para prisma.barbeiro
+        res.status(200).json(barbers);
+    } catch (error) {
+        console.error('Erro ao buscar barbeiros:', error);
+        res.status(500).json({ message: 'Erro interno do servidor ao buscar barbeiros.' });
+    }
+};
+
+export const getBarberById = async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id as string, 10); 
+
+    if (isNaN(id)) {
+        return res.status(400).json({ message: 'ID de barbeiro inválido.' });
+    }
+
+    try {
+        const barber = await prisma.barbeiro.findUnique({ // CORRIGIDO: de prisma.barber para prisma.barbeiro
+            where: { id },
         });
 
         if (!barber) {
             return res.status(404).json({ message: 'Barbeiro não encontrado.' });
         }
         res.status(200).json(barber);
-    } catch (error: any) {
-        console.error("Erro ao obter barbeiro:", error);
-        res.status(500).json({ message: 'Erro ao obter barbeiro.', error: error.message });
+    } catch (error) {
+        console.error('Erro ao buscar barbeiro por ID:', error);
+        res.status(500).json({ message: 'Erro interno do servidor ao buscar barbeiro.' });
     }
 };
 
-// @desc    Atualizar um barbeiro
-// @route   PUT /api/barbers/:id
-// @access  Private (proteger com authMiddleware)
 export const updateBarber = async (req: Request, res: Response) => {
-    const { id } = req.params;
+    const id = parseInt(req.params.id as string, 10); 
     const { nomeBarbeiro } = req.body;
 
+    if (isNaN(id)) {
+        return res.status(400).json({ message: 'ID de barbeiro inválido.' });
+    }
     if (!nomeBarbeiro) {
-        return res.status(400).json({ message: 'O nome do barbeiro não pode ser vazio.' });
+        return res.status(400).json({ message: 'Nome do barbeiro é obrigatório para atualização.' });
     }
 
     try {
-        // ID do parâmetro da URL é string, precisa converter para Int para o Prisma com SQLite
-        const barberId = parseInt(id); // <-- CORREÇÃO: Conversão de string para number
-        if (isNaN(barberId)) { // <-- Boa prática: verifica se a conversão foi bem-sucedida
-            return res.status(400).json({ message: 'ID de barbeiro inválido.' });
-        }
-
-        const updatedBarber = await prisma.barber.update({
-            where: { id: barberId }, // <-- Usando o ID convertido
-            data: {
-                nomeBarbeiro
-            }
+        const updatedBarber = await prisma.barbeiro.update({ // CORRIGIDO: de prisma.barber para prisma.barbeiro
+            where: { id },
+            data: { nomeBarbeiro },
         });
         res.status(200).json(updatedBarber);
     } catch (error: any) {
-        if (error.code === 'P2025' || error.message.includes('No Barber found')) {
+        console.error('Erro ao atualizar barbeiro:', error);
+        if (error.code === 'P2025') { 
             return res.status(404).json({ message: 'Barbeiro não encontrado para atualização.' });
         }
-        console.error("Erro ao atualizar barbeiro:", error);
-        res.status(500).json({ message: 'Erro ao atualizar barbeiro.', error: error.message });
+        if (error.code === 'P2002') { 
+            return res.status(409).json({ message: 'Já existe outro barbeiro com este nome.' });
+        }
+        res.status(500).json({ message: 'Erro interno do servidor ao atualizar barbeiro.' });
     }
 };
 
-// @desc    Deletar um barbeiro
-// @route   DELETE /api/barbers/:id
-// @access  Private (proteger com authMiddleware)
 export const deleteBarber = async (req: Request, res: Response) => {
-    const { id } = req.params;
+    const id = parseInt(req.params.id as string, 10); 
+
+    if (isNaN(id)) {
+        return res.status(400).json({ message: 'ID de barbeiro inválido.' });
+    }
 
     try {
-        // ID do parâmetro da URL é string, precisa converter para Int para o Prisma com SQLite
-        const barberId = parseInt(id); // <-- CORREÇÃO: Conversão de string para number
-        if (isNaN(barberId)) { // <-- Boa prática: verifica se a conversão foi bem-sucedida
-            return res.status(400).json({ message: 'ID de barbeiro inválido.' });
-        }
-
-        await prisma.barber.delete({
-            where: { id: barberId }, // <-- Usando o ID convertido
+        await prisma.barbeiro.delete({ // CORRIGIDO: de prisma.barber para prisma.barbeiro
+            where: { id },
         });
-        res.status(200).json({ message: 'Barbeiro deletado com sucesso.' });
+        res.status(204).send();
     } catch (error: any) {
-        if (error.code === 'P2025' || error.message.includes('No Barber found')) {
+        console.error('Erro ao deletar barbeiro:', error);
+        if (error.code === 'P2025') { 
             return res.status(404).json({ message: 'Barbeiro não encontrado para exclusão.' });
         }
-        console.error("Erro ao deletar barbeiro:", error);
-        res.status(500).json({ message: 'Erro ao deletar barbeiro.', error: error.message });
+        if (error.code === 'P2003') {
+            return res.status(409).json({ message: 'Não é possível deletar barbeiro com agendamentos existentes.' });
+        }
+        res.status(500).json({ message: 'Erro interno do servidor ao deletar barbeiro.' });
     }
 };

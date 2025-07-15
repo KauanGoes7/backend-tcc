@@ -4,57 +4,47 @@ generator client {
   provider = "prisma-client-js"
 }
 
-datasource db {
-  provider = "sqlite" // Provedor correto para SQLite
+datasource db { // Esta parte é essencial e estava faltando no seu print
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
-// Modelo de Usuário
 model User {
-  id        Int      @id @default(autoincrement()) // ID para SQLite: Int e autoincrement
-  nome      String
-  email     String   @unique
-  senha     String
-  appointments Appointment[] // Relação com agendamentos
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            Int         @id @default(autoincrement())
+  name          String
+  email         String      @unique
+  password      String
+  agendamentos  Agendamento[]
+
+  @@map("User") 
 }
 
-// Modelo de Serviço
-model Service {
-  id          Int      @id @default(autoincrement()) // ID para SQLite: Int e autoincrement
-  tema        String   // Ex: "Cabelo", "Barba", "Cabelo + Barba"
-  nomeServico String
-  appointments Appointment[] // Relação com agendamentos
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+model Barbeiro { // Nome do modelo com 'B' maiúsculo
+  id            Int         @id @default(autoincrement())
+  nomeBarbeiro  String      @unique 
+  agendamentos  Agendamento[]
+
+  @@map("Barbeiro") 
 }
 
-// Modelo de Barbeiro
-model Barber {
-  id           Int      @id @default(autoincrement()) // ID para SQLite: Int e autoincrement
-  nomeBarbeiro String
-  appointments Appointment[] // Relação com agendamentos
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+model Servico { // Nome do modelo com 'S' maiúsculo
+  id           Int         @id @default(autoincrement())
+  tema         String      
+  nomeServico  String      @unique 
+  agendamentos Agendamento[]
+
+  @@map("Servico") 
 }
 
-// Modelo de Agendamento
-model Appointment {
-  id          Int      @id @default(autoincrement()) // ID para SQLite: Int e autoincrement
-  dia         Int
-  mes         Int
+model Agendamento {
+  id          Int       @id @default(autoincrement())
+  data        DateTime  // O nome do campo é 'data' e o tipo é 'DateTime'
+  userId      Int
+  servicoId   Int
+  barbeiroId  Int
+  user        User      @relation(fields: [userId], references: [id])
+  servico     Servico   @relation(fields: [servicoId], references: [id])
+  barbeiro    Barbeiro  @relation(fields: [barbeiroId], references: [id])
 
-  // Relações com outros modelos - Chaves estrangeiras agora são Int
-  usuarioId   Int // Chave estrangeira para User
-  usuario     User     @relation(fields: [usuarioId], references: [id])
-
-  servicoId   Int // Chave estrangeira para Service
-  servico     Service  @relation(fields: [servicoId], references: [id])
-
-  barbeiroId  Int // Chave estrangeira para Barber
-  barbeiro    Barber   @relation(fields: [barbeiroId], references: [id])
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  @@map("Agendamento") 
 }

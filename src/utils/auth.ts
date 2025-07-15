@@ -1,6 +1,17 @@
 // src/utils/auth.ts
-import dotenv from 'dotenv';
-dotenv.config();
+import jwt from 'jsonwebtoken';
 
-export const jwtSecret = process.env.JWT_SECRET || 'umaChaveSecretaMuitoForteParaProducao'; // Use uma chave forte no .env
-export const jwtExpiresIn = '1d'; // Token expira em 1 dia
+// Certifique-se que JWT_SECRET está definido no seu arquivo .env
+export const jwtSecret = process.env.JWT_SECRET || 'uma_chave_secreta_padrao_muito_segura'; 
+
+export const generateToken = (id: number): string => {
+    return jwt.sign({ id: id.toString() }, jwtSecret, { 
+        expiresIn: '1h', // Define a expiração aqui. Não precisa exportar separadamente.
+    });
+};
+
+export interface DecodedToken {
+    id: string;
+    iat: number;
+    exp: number;
+}

@@ -1,0 +1,47 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db { // Esta parte é essencial e estava faltando no seu print
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            Int         @id @default(autoincrement())
+  name          String
+  email         String      @unique
+  password      String
+  agendamentos  Agendamento[]
+}
+
+model Barbeiro { // Nome do modelo com 'B' maiúsculo
+  id            Int         @id @default(autoincrement())
+  nomeBarbeiro  String      @unique 
+  agendamentos  Agendamento[]
+
+}
+
+model Servico { // Nome do modelo com 'S' maiúsculo
+  id           Int         @id @default(autoincrement())
+  tema         String      
+  nomeServico  String      @unique 
+  agendamentos Agendamento[]
+
+}
+
+
+
+model Agendamento {
+  id          Int       @id @default(autoincrement())
+  data        DateTime  // Este campo continua armazenando a data E a hora COMPLETA do agendamento (ex: "2025-07-25T10:30:00Z")
+  horario     String    // NOVO CAMPO: Para armazenar apenas a string da hora, como "09:00", "14:30", etc.
+  userId      Int
+  servicoId   Int
+  barbeiroId  Int
+  user        User      @relation(fields: [userId], references: [id])
+  servico     Servico   @relation(fields: [servicoId], references: [id])
+  barbeiro    Barbeiro  @relation(fields: [barbeiroId], references: [id])
+}
